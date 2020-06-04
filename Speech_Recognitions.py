@@ -56,17 +56,11 @@ def clustering(X, n_clusters=15):
 
 if __name__ == "__main__":
     train_names = ["Nguoi","Duoc","Cothe","Trong","Dang"]
-    test_names = ["test_Cothe","test_Nguoi","test_Duoc","test_Dang","test_Trong"]
     train_dataset = {}
-    test_dataset = {}
     for cname in train_names:
         print(f"Load {cname} dataset")
         train_dataset[cname] = get_class_data(os.path.join("Data", cname))
-        
-    for cname in test_names:
-        print(f"Load {cname} dataset")
-        test_dataset[cname] = get_class_data(os.path.join("Data", cname))
-
+    
     # Get all vectors in the train_dataset
     all_vectors = np.concatenate([np.concatenate(v, axis=0) for k, v in train_dataset.items()], axis=0)
     print("vectors", all_vectors.shape)
@@ -76,8 +70,6 @@ if __name__ == "__main__":
     
     for cname in train_dataset:
         train_dataset[cname] = list([kmeans.predict(v).reshape(-1, 1) for v in train_dataset[cname]])
-    for cname in test_dataset:
-        test_dataset[cname] = list([kmeans.predict(v).reshape(-1, 1) for v in test_dataset[cname]])
     
 models = {}
 cname = 'Nguoi'
@@ -100,7 +92,6 @@ if cname[:4] != 'test':
     X = np.concatenate(train_dataset[cname])
     lengths = list([len(x) for x in train_dataset[cname]])
     print("training class", cname)
-    print(X.shape, lengths, len(lengths))
     hmm.fit(X, lengths=lengths)
     models[cname] = hmm
 print("Training done")
@@ -125,7 +116,6 @@ if cname[:4] != 'test':
     X = np.concatenate(train_dataset[cname])
     lengths = list([len(x) for x in train_dataset[cname]])
     print("training class", cname)
-    print(X.shape, lengths, len(lengths))
     hmm.fit(X, lengths=lengths)
     models[cname] = hmm
 print("Training done")
@@ -150,7 +140,6 @@ if cname[:4] != 'test':
     X = np.concatenate(train_dataset[cname])
     lengths = list([len(x) for x in train_dataset[cname]])
     print("training class", cname)
-    print(X.shape, lengths, len(lengths))
     hmm.fit(X, lengths=lengths)
     models[cname] = hmm
 print("Training done")
@@ -172,7 +161,6 @@ if cname[:4] != 'test':
     X = np.concatenate(train_dataset[cname])
     lengths = list([len(x) for x in train_dataset[cname]])
     print("training class", cname)
-    print(X.shape, lengths, len(lengths))
     hmm.fit(X, lengths=lengths)
     models[cname] = hmm
 print("Training done")
@@ -194,7 +182,6 @@ if cname[:4] != 'test':
     X = np.concatenate(train_dataset[cname])
     lengths = list([len(x) for x in train_dataset[cname]])
     print("training class", cname)
-    print(X.shape, lengths, len(lengths))
     hmm.fit(X, lengths=lengths)
     models[cname] = hmm
 print("Training done")
@@ -275,6 +262,7 @@ class Recorder:
 
         self.recognize_lock = False
         self.start_lock = False
+    
 
     def record(self):
         file_name ="MicTest/test_mic/test.wav"
@@ -296,13 +284,10 @@ class Recorder:
         for cname in mic_name1s:
             print(f"Load {cname} dataset")
             mic_dataset1[cname] = get_class_data(os.path.join("MicTest", cname))
-        
-        for cname in mic_name1s:
             mic_dataset1[cname] = list([kmeans.predict(v).reshape(-1, 1) for v in mic_dataset1[cname]])
         
         print("Testing file mic")
         true_cname = "test_mic"
-        #for true_cname in mic_name1s:
         print(true_cname)
         scores = {}
         for cname, model in models.items():
