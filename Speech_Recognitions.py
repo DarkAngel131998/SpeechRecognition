@@ -1,6 +1,7 @@
 import librosa
 import numpy as np
 import os
+import pyaudio
 import math
 from sklearn.cluster import KMeans
 import hmmlearn.hmm
@@ -13,6 +14,7 @@ import keyboard
 import time
 import threading
 import tkinter
+import wave
 
 TITLE = "Word Reconigtion"
 RESOLUTION = "600x300"
@@ -25,8 +27,12 @@ LABEL_CONFIG = {
 }
 
 
-def get_mfcc(file_path):
+
+def get_mfcc(file_path,test):
     y, sr = librosa.load(file_path) # read .wav file
+    if (test):
+        y, index = librosa.effects.trim(y,top_db=50,frame_length=551,hop_length=220)
+        print(librosa.get_duration(y))
     hop_length = math.floor(sr*0.010) # 10ms hop
     win_length = math.floor(sr*0.025) # 25ms frame
     # mfcc is 12 x T matrix
@@ -43,159 +49,41 @@ def get_mfcc(file_path):
     # return T x 36 (transpose of X)
     return X.T # hmmlearn use T x N matrix
 
-def get_class_data(data_dir):
+def get_class_data(data_dir,test):
     files = os.listdir(data_dir)
-    mfcc = [get_mfcc(os.path.join(data_dir,f)) for f in files if f.endswith(".wav")]
+    mfcc = [get_mfcc(os.path.join(data_dir,f),test) for f in files if f.endswith(".wav")]
     return mfcc
 
-def clustering(X, n_clusters=15):
-    kmeans = KMeans(n_clusters=n_clusters, n_init=50, random_state=0, verbose=0)
-    kmeans.fit(X)
-    print("centers", kmeans.cluster_centers_.shape)
-    return kmeans
+# def clustering(X, n_clusters=15):
+#     kmeans = KMeans(n_clusters=n_clusters, n_init=50, random_state=0, verbose=0)
+#     kmeans.fit(X)
+#     print("centers", kmeans.cluster_centers_.shape)
+#     return kmeans
 
-if __name__ == "__main__":
-    train_names = ["Nguoi","Duoc","Cothe","Trong","Dang"]
-    train_dataset = {}
-    for cname in train_names:
-        print(f"Load {cname} dataset")
-        train_dataset[cname] = get_class_data(os.path.join("Data", cname))
+# if __name__ == "__main__":
+#     train_names = ["Nguoi","Duoc","Cothe","Trong","Dang"]
+#     train_dataset = {}
+#     for cname in train_names:
+#         print(f"Load {cname} dataset")
+#         train_dataset[cname] = get_class_data(os.path.join("Data", cname),False)
     
-    # Get all vectors in the train_dataset
-    all_vectors = np.concatenate([np.concatenate(v, axis=0) for k, v in train_dataset.items()], axis=0)
-    print("vectors", all_vectors.shape)
-    # Run K-Means algorithm to get clusters
-    kmeans = clustering(all_vectors)
-    print("centers", kmeans.cluster_centers_.shape)
+#     # Get all vectors in the train_dataset
+#     all_vectors = np.concatenate([np.concatenate(v, axis=0) for k, v in train_dataset.items()], axis=0)
+#     print("vectors", all_vectors.shape)
+#     # Run K-Means algorithm to get clusters
+#     kmeans = clustering(all_vectors)
+#     print("centers", kmeans.cluster_centers_.shape)
     
-    for cname in train_dataset:
-        train_dataset[cname] = list([kmeans.predict(v).reshape(-1, 1) for v in train_dataset[cname]])
-    
+#     for cname in train_dataset:
+#         train_dataset[cname] = list([kmeans.predict(v).reshape(-1, 1) for v in train_dataset[cname]])
+
+#load models
+train_names = ["Nguoi","Duoc","Cothe","Trong","Dang"]
 models = {}
-cname = 'Nguoi'
-hmm = hmmlearn.hmm.MultinomialHMM(n_components=12, random_state=0, n_iter=1000, verbose=True, init_params='e', params='ste')
-hmm.startprob_ = np.array([0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ])
-hmm.transmat_ =np.array([
-    [0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.3, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, ],])
-if cname[:4] != 'test':
-    X = np.concatenate(train_dataset[cname])
-    lengths = list([len(x) for x in train_dataset[cname]])
-    print("training class", cname)
-    hmm.fit(X, lengths=lengths)
-    models[cname] = hmm
-print("Training done")
-
-cname = 'Duoc'
-hmm = hmmlearn.hmm.MultinomialHMM(n_components=12, random_state=0, n_iter=1000, verbose=True, init_params='e', params='ste')
-hmm.startprob_ = np.array([0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ])
-hmm.transmat_ =np.array([
-    [0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.3, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, ],])
-if cname[:4] != 'test':
-    X = np.concatenate(train_dataset[cname])
-    lengths = list([len(x) for x in train_dataset[cname]])
-    print("training class", cname)
-    hmm.fit(X, lengths=lengths)
-    models[cname] = hmm
-print("Training done")
-
-cname = 'Cothe'
-hmm = hmmlearn.hmm.MultinomialHMM(n_components=12, random_state=0, n_iter=1000, verbose=True, init_params='e', params='ste')
-hmm.startprob_ = np.array([0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ])
-hmm.transmat_ =np.array([
-    [0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.3, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, ],])
-if cname[:4] != 'test':
-    X = np.concatenate(train_dataset[cname])
-    lengths = list([len(x) for x in train_dataset[cname]])
-    print("training class", cname)
-    hmm.fit(X, lengths=lengths)
-    models[cname] = hmm
-print("Training done")
-
-cname = 'Trong'
-hmm = hmmlearn.hmm.MultinomialHMM(n_components=9, random_state=0, n_iter=1000, verbose=True, init_params='e', params='ste')
-hmm.startprob_ = np.array([0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ])
-hmm.transmat_ =np.array([
-    [0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.3, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, ],])
-if cname[:4] != 'test':
-    X = np.concatenate(train_dataset[cname])
-    lengths = list([len(x) for x in train_dataset[cname]])
-    print("training class", cname)
-    hmm.fit(X, lengths=lengths)
-    models[cname] = hmm
-print("Training done")
-
-cname = 'Dang'
-hmm = hmmlearn.hmm.MultinomialHMM(n_components=9, random_state=0, n_iter=1000, verbose=True, init_params='e', params='ste')
-hmm.startprob_ = np.array([0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ])
-hmm.transmat_ =np.array([
-    [0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, 0.0, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.2, 0.1, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.7, 0.3, ],
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, ],])
-if cname[:4] != 'test':
-    X = np.concatenate(train_dataset[cname])
-    lengths = list([len(x) for x in train_dataset[cname]])
-    print("training class", cname)
-    hmm.fit(X, lengths=lengths)
-    models[cname] = hmm
-print("Training done")
-
-misc = sd.query_devices()
-
-sd.default.device = 1
-
-q = queue.Queue()
-def callback(indata, frames, time, status):
-    """This is called (from a separate thread) for each audio block."""
-    if status:
-        print(status, file=sys.stderr)
-    q.put(indata.copy())
+for cname in train_names:
+     models[cname] = pk.load(open("Models/" + cname + ".pkl", 'rb'))
+#load kmeans
+kmeans = pk.load(open("Models/kmeans.pkl", 'rb'))
 
 class Recorder:
     def __init__(self):
@@ -217,12 +105,6 @@ class Recorder:
         self.stop_button.pack()
         self.stop_lock = True
 
-        self.status = tkinter.Label(
-            root,
-            text="No recording"
-        )
-        self.status.pack()
-
         self.recognize_button = tkinter.Button(
             root,
             text="Recognize Word",
@@ -230,6 +112,12 @@ class Recorder:
             **BUTTON_CONFIG
         )
         self.recognize_button.pack()
+
+        self.status = tkinter.Label(
+            root,
+            text="No recording"
+        )
+        self.status.pack()
         self.recognize_lock = True
 
         self.is_recording = False
@@ -241,15 +129,26 @@ class Recorder:
 
         self.start_lock = True
 
+        self.audio = pyaudio.PyAudio()
+        self.stream = self.audio.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=22050,
+            frames_per_buffer=1024,
+            input=True
+        )
+
+        self.frames = []
+
         self.is_recording = True
-        self.status.config(text="Recording")
+        self.status.config(text="Đang ghi âm")
 
         self.recognize_lock = True
         self.stop_lock = False
 
         thread = threading.Thread(target=self.record)
         thread.start()
-
+    
     def stop_recording(self):
         if self.stop_lock:
             return
@@ -258,32 +157,33 @@ class Recorder:
 
         self.is_recording = False
 
-        self.status.config(text="Recorded")
+        wave_file = wave.open("MicTest/test_mic/test.wav", "wb")
+
+        wave_file.setnchannels(1)
+        wave_file.setsampwidth(self.audio.get_sample_size(pyaudio.paInt16))
+        wave_file.setframerate(22050)
+
+        wave_file.writeframes(b''.join(self.frames))
+        wave_file.close()
+
+        self.status.config(text="Đã ghi xong")
 
         self.recognize_lock = False
         self.start_lock = False
-    
+  
 
     def record(self):
-        file_name ="MicTest/test_mic/test.wav"
-        try:
-            os.remove(file_name)
-        except:
-            pass
-        with sf.SoundFile(file_name, mode='x', samplerate=22000,
-                  channels=1) as file:
-            with sd.InputStream(samplerate=22000, device=sd.default.device,
-                channels=1, callback=callback):
-                while (self.is_recording):
-                    file.write(q.get())
-        print('done recording')
+        while (self.is_recording):
+            data = self.stream.read(1024)
+            self.frames.append(data)
+ 
 
     def recognize(self):
         mic_name1s = ["test_mic"]
         mic_dataset1 = {}
         for cname in mic_name1s:
             print(f"Load {cname} dataset")
-            mic_dataset1[cname] = get_class_data(os.path.join("MicTest", cname))
+            mic_dataset1[cname] = get_class_data(os.path.join("MicTest", cname),True)
             mic_dataset1[cname] = list([kmeans.predict(v).reshape(-1, 1) for v in mic_dataset1[cname]])
         
         print("Testing file mic")
@@ -296,7 +196,7 @@ class Recorder:
 
         srt = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         print(srt)
-        self.status.config(text=f"This is \"{srt[0][0]}\"")
+        self.status.config(text=f"Đây là \"{srt[0][0]}\"")
 
 root = tkinter.Tk()
 root.title(TITLE)
