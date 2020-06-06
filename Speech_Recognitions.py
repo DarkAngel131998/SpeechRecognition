@@ -31,7 +31,7 @@ LABEL_CONFIG = {
 def get_mfcc(file_path,test):
     y, sr = librosa.load(file_path) # read .wav file
     if (test):
-        y, index = librosa.effects.trim(y,top_db=50,frame_length=551,hop_length=220)
+        y, index = librosa.effects.trim(y,top_db=20,frame_length=250,hop_length=100)
         print(librosa.get_duration(y))
     hop_length = math.floor(sr*0.010) # 10ms hop
     win_length = math.floor(sr*0.025) # 25ms frame
@@ -133,7 +133,7 @@ class Recorder:
         self.stream = self.audio.open(
             format=pyaudio.paInt16,
             channels=1,
-            rate=22050,
+            rate=44100,
             frames_per_buffer=1024,
             input=True
         )
@@ -161,7 +161,7 @@ class Recorder:
 
         wave_file.setnchannels(1)
         wave_file.setsampwidth(self.audio.get_sample_size(pyaudio.paInt16))
-        wave_file.setframerate(22050)
+        wave_file.setframerate(44100)
 
         wave_file.writeframes(b''.join(self.frames))
         wave_file.close()
